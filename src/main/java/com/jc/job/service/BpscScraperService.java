@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -25,48 +26,59 @@ public class BpscScraperService implements ScraperService {
 
 	@Override
 	public void scrapeAndSave() {
-		WebDriverManager.chromedriver().setup(); // auto-download chromedriver
+		WebDriverManager.chromedriver().setup();
 
 		ChromeOptions options = new ChromeOptions();
-		options.addArguments("--headless=new"); // headless mode (no GUI)
+		options.addArguments("--headless=new"); // headless mode
 		options.addArguments("--disable-gpu");
 		options.addArguments("--window-size=1920,1080");
 
 		WebDriver driver = new ChromeDriver(options);
 
 		try {
-			String url = "https://bpsc.gov.bd/site/view/psc_exam/BCS_Examination/বিসিএস-পরীক্ষা";
-			driver.get(url);
+			// Map of URLs and their categories
+			Map<String, String> examPages = Map.of(
+					"https://bpsc.gov.bd/site/view/psc_exam/BCS_Examination/বিসিএস-পরীক্ষা", "বিসিএস-পরীক্ষা",
+					"https://bpsc.gov.bd/site/view/psc_exam/Senior_Scale_Examination/সিনিয়র-স্কেল-পরীক্ষা",
+					"সিনিয়র-স্কেল-পরীক্ষা"
+			// Add more pages and categories as needed
+			);
 
-			// Wait for page to fully load (if needed)
-			Thread.sleep(5000); // replace with WebDriverWait for production use
+			for (Map.Entry<String, String> entry : examPages.entrySet()) {
+				String url = entry.getKey();
+				String category = entry.getValue();
 
-			List<WebElement> pdfLinks = driver.findElements(By.xpath("//a[contains(@href, '.pdf')]"));
+				System.out.println("📄 Visiting: " + url);
+				driver.get(url);
+				Thread.sleep(4000); // wait for page to load JS content
 
-			System.out.println("🔍 Found PDF links: " + pdfLinks.size());
+				List<WebElement> pdfLinks = driver.findElements(By.xpath("//a[contains(@href, '.pdf')]"));
+				System.out.println("🔍 Found " + pdfLinks.size() + " PDFs on category: " + category);
 
-			for (WebElement link : pdfLinks) {
-				String title = link.getText().trim();
-				String href = link.getAttribute("href");
+				for (WebElement link : pdfLinks) {
+					String title = link.getText().trim();
+					String href = link.getAttribute("href");
 
-				if (href == null || href.isEmpty())
-					continue;
+					if (href == null || href.isEmpty())
+						continue;
 
-				String sourceId = String.valueOf(href.hashCode());
+					String sourceId = String.valueOf(href.hashCode());
 
-				Optional<JobCircularEntity> existing = repo.findBySourceId(sourceId);
-				if (existing.isEmpty()) {
-					JobCircularEntity circular = new JobCircularEntity();
-					circular.setTitle(title);
-					circular.setDepartment("BPSC");
-					circular.setLink(href);
-					circular.setSourceId(sourceId);
-					circular.setPublishDate(LocalDate.now());
+					Optional<JobCircularEntity> existing = repo.findBySourceId(sourceId);
+					if (existing.isEmpty()) {
+						JobCircularEntity circular = new JobCircularEntity();
+						circular.setTitle(title);
+						circular.setDepartment("BPSC");
+						circular.setCategory(category); // save category here
+						circular.setLink(href);
+						circular.setSourceId(sourceId);
+						circular.setPublishDate(LocalDate.now()); // or extract real date if possible
 
-					repo.save(circular);
-					System.out.println("✅ Saved: " + title);
-				} else {
-					System.out.println("⏩ Skipped (already exists): " + title);
+						repo.save(circular);
+						System.out.println("✅ Saved: " + title + " (" + category + ")");
+					} else {
+						System.out.println("⏩ Skipped (duplicate): " + title);
+					}
 				}
 			}
 
@@ -76,4 +88,5 @@ public class BpscScraperService implements ScraperService {
 			driver.quit();
 		}
 	}
+
 }

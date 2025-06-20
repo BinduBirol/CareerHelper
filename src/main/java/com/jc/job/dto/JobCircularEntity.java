@@ -29,6 +29,8 @@ public class JobCircularEntity {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    private String category;
 
     // Getters and setters omitted for brevity
 
@@ -106,6 +108,14 @@ public class JobCircularEntity {
 
 	public void setUpdatedAt(LocalDateTime updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+
+	public String getCategory() {
+		return category;
+	}
+
+	public void setCategory(String category) {
+		this.category = category;
 	}
     
     
